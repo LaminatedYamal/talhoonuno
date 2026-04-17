@@ -145,7 +145,7 @@ function Dashboard() {
                       borderRadius: 8,
                       fontSize: 12,
                     }}
-                    formatter={(v: number) => currency(v)}
+                    formatter={(v) => currency(Number(v))}
                   />
                   <Area
                     type="monotone"

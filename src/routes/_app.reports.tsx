@@ -150,7 +150,7 @@ function ReportsPage() {
                       borderRadius: 8,
                       fontSize: 12,
                     }}
-                    formatter={(v: number) => currency(v)}
+                    formatter={(v) => currency(Number(v))}
                   />
                   <Legend />
                   <Bar dataKey="revenue" name="Revenue" fill="var(--color-primary)" radius={4} />
