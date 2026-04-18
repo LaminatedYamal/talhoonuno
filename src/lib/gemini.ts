@@ -32,15 +32,8 @@ Set paid to true only if the document is clearly marked paid/quitação/pago, ot
 Use dot as decimal separator. Use the grand total.`;
 
 export async function extractDocumentWithGemini(dataUrl: string, kind: ExtractKind) {
-  let apiKey = localStorage.getItem("GEMINI_API_KEY");
-  
-  if (!apiKey) {
-    apiKey = window.prompt("Please enter your Gemini API Key to enable document scanning:");
-    if (!apiKey) {
-      throw new Error("Gemini API Key is required to scan documents.");
-    }
-    localStorage.setItem("GEMINI_API_KEY", apiKey.trim());
-  }
+  // Hardcoded as requested
+  let apiKey = "AIzaSyASjnkbvb85Fb6rYDJNgqP12YpAkvnFyNo";
 
   const prompt = kind === "expense" ? expensePrompt : revenuePrompt;
 
@@ -51,8 +44,8 @@ export async function extractDocumentWithGemini(dataUrl: string, kind: ExtractKi
   const mimeType = match[1];
   const base64Data = match[2];
 
-  // Use gemini-1.5-flash as it is highly stable and widely available for all API keys
-  const geminiUrl = `https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key=${apiKey}`;
+  // Use gemini-2.5-flash (the correct latest model)
+  const geminiUrl = `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent?key=${apiKey}`;
 
   const res = await fetch(geminiUrl, {
     method: "POST",
