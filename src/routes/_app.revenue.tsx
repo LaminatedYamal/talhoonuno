@@ -39,7 +39,7 @@ import { useInvoices, type Invoice } from "@/lib/data-hooks";
 import { currency } from "@/lib/format";
 import { InvoiceDialog } from "@/components/InvoiceDialog";
 
-export const Route = createFileRoute("/_app/invoices")({
+export const Route = createFileRoute("/_app/revenue")({
   component: InvoicesPage,
 });
 
