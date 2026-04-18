@@ -117,7 +117,10 @@ export function ExpenseDialog({ open, onOpenChange, expense }: Props) {
       toast.success(editing ? t.expenses.updatedToast : t.expenses.savedToast);
       onOpenChange(false);
     },
-    onError: (e) => toast.error(e instanceof Error ? e.message : t.common.somethingWrong),
+    onError: (e: any) => {
+      console.error(e);
+      toast.error(e?.message || e?.error_description || t.common.somethingWrong);
+    },
   });
 
   const handleSubmit = (e: FormEvent) => {
