@@ -1,4 +1,4 @@
-import { useState, type FormEvent } from "react";
+import { useState, useRef, type FormEvent, type ChangeEvent } from "react";
 import { useMutation, useQueryClient } from "@tanstack/react-query";
 import { z } from "zod";
 import { toast } from "sonner";
@@ -22,13 +22,15 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
-import { Loader2 } from "lucide-react";
+import { Loader2, Camera, Sparkles } from "lucide-react";
 import type { Invoice } from "@/lib/data-hooks";
+import { useI18n } from "@/i18n/I18nProvider";
+import { fileToDataUrl } from "@/lib/image";
 
 const schema = z.object({
-  customer_name: z.string().trim().min(1, "Customer name is required").max(120),
-  invoice_date: z.string().min(1, "Date is required"),
-  amount: z.coerce.number().min(0, "Amount must be ≥ 0").max(1_000_000),
+  customer_name: z.string().trim().min(1).max(120),
+  invoice_date: z.string().min(1),
+  amount: z.coerce.number().min(0).max(1_000_000),
   paid: z.enum(["paid", "unpaid"]),
   notes: z.string().trim().max(500).optional().or(z.literal("")),
 });
@@ -41,6 +43,7 @@ interface Props {
 
 export function InvoiceDialog({ open, onOpenChange, invoice }: Props) {
   const editing = !!invoice;
+  const { t } = useI18n();
   const qc = useQueryClient();
   const [customer, setCustomer] = useState(invoice?.customer_name ?? "");
   const [date, setDate] = useState(
@@ -49,11 +52,44 @@ export function InvoiceDialog({ open, onOpenChange, invoice }: Props) {
   const [amount, setAmount] = useState<string>(invoice ? String(invoice.amount) : "");
   const [paid, setPaid] = useState<"paid" | "unpaid">(invoice?.paid ? "paid" : "unpaid");
   const [notes, setNotes] = useState(invoice?.notes ?? "");
+  const [extracting, setExtracting] = useState(false);
+  const fileInput = useRef<HTMLInputElement>(null);
 
-  // Reset form when dialog reopens with different invoice
   const key = `${invoice?.id ?? "new"}-${open}`;
-  // eslint-disable-next-line react-hooks/exhaustive-deps
-  // We use 'key' indirectly: state initialized once per mount; consumers re-mount via key prop below.
+
+  const handlePhoto = async (e: ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    e.target.value = "";
+    if (!file) return;
+    setExtracting(true);
+    try {
+      const dataUrl = await fileToDataUrl(file);
+      const { data, error } = await supabase.functions.invoke("extract-document", {
+        body: { image: dataUrl, kind: "revenue" },
+      });
+      if (error) throw error;
+      const r = data?.result as
+        | {
+            invoice_date?: string;
+            amount?: number;
+            customer_name?: string;
+            paid?: boolean;
+            notes?: string;
+          }
+        | undefined;
+      if (!r) throw new Error("No data");
+      if (r.invoice_date) setDate(r.invoice_date);
+      if (typeof r.amount === "number" && r.amount > 0) setAmount(String(r.amount));
+      if (r.customer_name) setCustomer(r.customer_name);
+      if (typeof r.paid === "boolean") setPaid(r.paid ? "paid" : "unpaid");
+      if (r.notes) setNotes(r.notes);
+      toast.success(t.common.extractedOk);
+    } catch (err) {
+      toast.error(err instanceof Error ? err.message : t.common.extractFailed);
+    } finally {
+      setExtracting(false);
+    }
+  };
 
   const mutation = useMutation({
     mutationFn: async (values: z.infer<typeof schema>) => {
@@ -77,10 +113,10 @@ export function InvoiceDialog({ open, onOpenChange, invoice }: Props) {
     },
     onSuccess: () => {
       qc.invalidateQueries({ queryKey: ["invoices"] });
-      toast.success(editing ? "Invoice updated" : "Invoice added");
+      toast.success(editing ? t.revenue.updatedToast : t.revenue.savedToast);
       onOpenChange(false);
     },
-    onError: (e) => toast.error(e instanceof Error ? e.message : "Failed to save"),
+    onError: (e) => toast.error(e instanceof Error ? e.message : t.common.somethingWrong),
   });
 
   const handleSubmit = (e: FormEvent) => {
@@ -93,7 +129,7 @@ export function InvoiceDialog({ open, onOpenChange, invoice }: Props) {
       notes,
     });
     if (!parsed.success) {
-      toast.error(parsed.error.issues[0]?.message ?? "Invalid input");
+      toast.error(parsed.error.issues[0]?.message ?? t.common.somethingWrong);
       return;
     }
     mutation.mutate(parsed.data);
@@ -103,25 +139,58 @@ export function InvoiceDialog({ open, onOpenChange, invoice }: Props) {
     <Dialog open={open} onOpenChange={onOpenChange} key={key}>
       <DialogContent>
         <DialogHeader>
-          <DialogTitle>{editing ? "Edit invoice" : "New invoice"}</DialogTitle>
+          <DialogTitle>{editing ? t.revenue.editRevenue : t.revenue.newRevenue}</DialogTitle>
           <DialogDescription>
-            {editing ? "Update invoice details." : "Record a new invoice for a customer."}
+            {editing ? t.revenue.editDescription : t.revenue.newDescription}
           </DialogDescription>
         </DialogHeader>
+
+        {!editing && (
+          <div className="rounded-lg border border-dashed border-primary/40 bg-primary/5 p-3">
+            <input
+              ref={fileInput}
+              type="file"
+              accept="image/*"
+              capture="environment"
+              className="hidden"
+              onChange={handlePhoto}
+            />
+            <Button
+              type="button"
+              variant="outline"
+              className="w-full border-primary/30"
+              onClick={() => fileInput.current?.click()}
+              disabled={extracting}
+            >
+              {extracting ? (
+                <>
+                  <Loader2 className="h-4 w-4 animate-spin" /> {t.common.extracting}
+                </>
+              ) : (
+                <>
+                  <Camera className="h-4 w-4" />
+                  <Sparkles className="h-3 w-3 text-gold" />
+                  {t.common.photo}
+                </>
+              )}
+            </Button>
+          </div>
+        )}
+
         <form onSubmit={handleSubmit} className="space-y-4">
           <div className="space-y-2">
-            <Label htmlFor="customer">Customer</Label>
+            <Label htmlFor="customer">{t.common.customer}</Label>
             <Input
               id="customer"
               value={customer}
               onChange={(e) => setCustomer(e.target.value)}
-              placeholder="e.g. Maria's Restaurant"
+              placeholder={t.revenue.customerPlaceholder}
               required
             />
           </div>
           <div className="grid grid-cols-2 gap-3">
             <div className="space-y-2">
-              <Label htmlFor="date">Date</Label>
+              <Label htmlFor="date">{t.common.date}</Label>
               <Input
                 id="date"
                 type="date"
@@ -131,7 +200,7 @@ export function InvoiceDialog({ open, onOpenChange, invoice }: Props) {
               />
             </div>
             <div className="space-y-2">
-              <Label htmlFor="amount">Amount</Label>
+              <Label htmlFor="amount">{t.common.amount}</Label>
               <Input
                 id="amount"
                 type="number"
@@ -145,19 +214,19 @@ export function InvoiceDialog({ open, onOpenChange, invoice }: Props) {
             </div>
           </div>
           <div className="space-y-2">
-            <Label>Status</Label>
+            <Label>{t.common.status}</Label>
             <Select value={paid} onValueChange={(v) => setPaid(v as "paid" | "unpaid")}>
               <SelectTrigger>
                 <SelectValue />
               </SelectTrigger>
               <SelectContent>
-                <SelectItem value="unpaid">Unpaid</SelectItem>
-                <SelectItem value="paid">Paid</SelectItem>
+                <SelectItem value="unpaid">{t.revenue.unpaid}</SelectItem>
+                <SelectItem value="paid">{t.revenue.paid}</SelectItem>
               </SelectContent>
             </Select>
           </div>
           <div className="space-y-2">
-            <Label htmlFor="notes">Notes (optional)</Label>
+            <Label htmlFor="notes">{t.common.notesOptional}</Label>
             <Textarea
               id="notes"
               value={notes ?? ""}
@@ -168,11 +237,11 @@ export function InvoiceDialog({ open, onOpenChange, invoice }: Props) {
           </div>
           <DialogFooter>
             <Button type="button" variant="outline" onClick={() => onOpenChange(false)}>
-              Cancel
+              {t.common.cancel}
             </Button>
             <Button type="submit" disabled={mutation.isPending}>
               {mutation.isPending && <Loader2 className="h-4 w-4 animate-spin" />}
-              {editing ? "Save changes" : "Add invoice"}
+              {editing ? t.common.saveChanges : t.revenue.addRevenue}
             </Button>
           </DialogFooter>
         </form>

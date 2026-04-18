@@ -305,4 +305,10 @@ export const translations = {
   },
 } as const;
 
-export type Dict = typeof translations.pt;
+type DeepReadonlyToString<T> = T extends string
+  ? string
+  : T extends object
+    ? { -readonly [K in keyof T]: DeepReadonlyToString<T[K]> }
+    : T;
+
+export type Dict = DeepReadonlyToString<typeof translations.pt>;
