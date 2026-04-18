@@ -5,15 +5,16 @@ Extract the following fields and return ONLY valid JSON (no markdown, no code fe
 {
   "expense_date": "YYYY-MM-DD format. Convert DD/MM/YYYY if needed. Empty string if unsure.",
   "amount": 0.00,
-  "category": "one of: meat_purchases, supplies, utilities, wages, other",
+  "category": "one of: meat_purchases, supplies, utilities, wages, rent, other",
   "notes": "Brief note: supplier/vendor name and 1-3 word description. Empty string if none."
 }
 
 Category guide:
 - meat_purchases: meat/livestock suppliers
 - supplies: packaging, cleaning, equipment
-- utilities: water, electricity, gas, rent
+- utilities: water, electricity, gas
 - wages: payroll, salaries
+- rent: shop or office rent
 - other: anything else
 
 Use dot as decimal separator. Use the grand total, not subtotal.`;

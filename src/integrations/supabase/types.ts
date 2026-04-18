@@ -96,6 +96,7 @@ export type Database = {
         | "supplies"
         | "utilities"
         | "wages"
+        | "rent"
         | "other"
     }
     CompositeTypes: {
@@ -229,6 +230,7 @@ export const Constants = {
         "supplies",
         "utilities",
         "wages",
+        "rent",
         "other",
       ],
     },

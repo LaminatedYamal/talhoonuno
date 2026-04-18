@@ -3,6 +3,7 @@ export const expenseCategories = [
   "supplies",
   "utilities",
   "wages",
+  "rent",
   "other",
 ] as const;
 export type ExpenseCategory = (typeof expenseCategories)[number];

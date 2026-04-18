@@ -25,7 +25,7 @@ export type Invoice = {
 export type Expense = {
   id: string;
   expense_date: string;
-  category: "meat_purchases" | "supplies" | "utilities" | "wages" | "other";
+  category: "meat_purchases" | "supplies" | "utilities" | "wages" | "rent" | "other";
   amount: number;
   notes: string | null;
   created_at: string;
