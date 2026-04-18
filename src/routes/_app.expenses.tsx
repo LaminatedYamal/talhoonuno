@@ -43,6 +43,7 @@ function ExpensesPage() {
   const { t, lang } = useI18n();
   const currency = useCurrency();
   const dLocale = lang === "pt" ? ptLocale : enLocale;
+  const [preset, setPreset] = useState<PresetKey>("this_month");
   const [from, setFrom] = useState("");
   const [to, setTo] = useState("");
   const [showAdvanced, setShowAdvanced] = useState(false);
