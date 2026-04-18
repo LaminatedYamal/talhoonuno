@@ -51,8 +51,8 @@ export async function extractDocumentWithGemini(dataUrl: string, kind: ExtractKi
   const mimeType = match[1];
   const base64Data = match[2];
 
-  // Using gemini-2.0-flash as it's the latest and greatest vision model
-  const geminiUrl = `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:generateContent?key=${apiKey}`;
+  // Use gemini-1.5-flash as it is highly stable and widely available for all API keys
+  const geminiUrl = `https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key=${apiKey}`;
 
   const res = await fetch(geminiUrl, {
     method: "POST",
@@ -78,11 +78,16 @@ export async function extractDocumentWithGemini(dataUrl: string, kind: ExtractKi
   });
 
   if (!res.ok) {
+    const errorBody = await res.text();
+    console.error("Gemini API Error:", res.status, errorBody);
     if (res.status === 401 || res.status === 403 || res.status === 400) {
-      localStorage.removeItem("GEMINI_API_KEY");
-      throw new Error("Invalid Gemini API Key. Please try again.");
+      if (res.status === 400 && errorBody.includes("API key not valid")) {
+        localStorage.removeItem("GEMINI_API_KEY");
+        throw new Error("Invalid Gemini API Key. Please refresh and try again.");
+      }
+      throw new Error(`API Error (${res.status}): ${errorBody.slice(0, 150)}...`);
     }
-    throw new Error("AI extraction failed: " + res.statusText);
+    throw new Error(`AI extraction failed (${res.status}): ${errorBody.slice(0, 150)}...`);
   }
 
   const data = await res.json();
