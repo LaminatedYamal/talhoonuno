@@ -32,7 +32,7 @@ const schema = z.object({
   customer_name: z.string().trim().min(1).max(120),
   invoice_date: z.string().min(1),
   amount: z.coerce.number().min(0).max(1_000_000),
-  notes: z.string().trim().max(500).optional().or(z.literal("")),
+  notes: z.string().trim().max(5000).optional().or(z.literal("")),
 });
 
 interface Props {
@@ -239,8 +239,8 @@ export function InvoiceDialog({ open, onOpenChange, invoice }: Props) {
               id="notes"
               value={notes ?? ""}
               onChange={(e) => setNotes(e.target.value)}
-              maxLength={500}
-              rows={2}
+              maxLength={5000}
+              rows={4}
             />
           </div>
           <DialogFooter>

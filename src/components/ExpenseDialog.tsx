@@ -34,7 +34,7 @@ const schema = z.object({
   category: z.enum(expenseCategories),
   amount: z.coerce.number().min(0).max(1_000_000),
   paid: z.enum(["paid", "unpaid"]),
-  notes: z.string().trim().max(500).optional().or(z.literal("")),
+  notes: z.string().trim().max(5000).optional().or(z.literal("")),
 });
 
 interface Props {
@@ -252,8 +252,8 @@ export function ExpenseDialog({ open, onOpenChange, expense }: Props) {
               id="enotes"
               value={notes ?? ""}
               onChange={(e) => setNotes(e.target.value)}
-              maxLength={500}
-              rows={2}
+              maxLength={5000}
+              rows={4}
             />
           </div>
           <DialogFooter>
