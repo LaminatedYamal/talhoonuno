@@ -26,6 +26,7 @@ import { Loader2, Camera, Sparkles } from "lucide-react";
 import type { Invoice } from "@/lib/data-hooks";
 import { useI18n } from "@/i18n/I18nProvider";
 import { fileToDataUrl } from "@/lib/image";
+import { extractDocumentWithGemini } from "@/lib/gemini";
 
 const schema = z.object({
   customer_name: z.string().trim().min(1).max(120),
@@ -64,11 +65,8 @@ export function InvoiceDialog({ open, onOpenChange, invoice }: Props) {
     setExtracting(true);
     try {
       const dataUrl = await fileToDataUrl(file);
-      const { data, error } = await supabase.functions.invoke("extract-document", {
-        body: { image: dataUrl, kind: "revenue" },
-      });
-      if (error) throw error;
-      const r = data?.result as
+      const result = await extractDocumentWithGemini(dataUrl, "revenue");
+      const r = result as
         | {
             invoice_date?: string;
             amount?: number;

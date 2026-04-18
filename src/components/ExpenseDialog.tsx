@@ -27,6 +27,7 @@ import { expenseCategories, type ExpenseCategory } from "@/lib/format";
 import type { Expense } from "@/lib/data-hooks";
 import { useI18n } from "@/i18n/I18nProvider";
 import { fileToDataUrl } from "@/lib/image";
+import { extractDocumentWithGemini } from "@/lib/gemini";
 
 const schema = z.object({
   expense_date: z.string().min(1),
@@ -65,11 +66,8 @@ export function ExpenseDialog({ open, onOpenChange, expense }: Props) {
     setExtracting(true);
     try {
       const dataUrl = await fileToDataUrl(file);
-      const { data, error } = await supabase.functions.invoke("extract-document", {
-        body: { image: dataUrl, kind: "expense" },
-      });
-      if (error) throw error;
-      const r = data?.result as
+      const result = await extractDocumentWithGemini(dataUrl, "expense");
+      const r = result as
         | { expense_date?: string; amount?: number; category?: ExpenseCategory; notes?: string }
         | undefined;
       if (!r) throw new Error("No data");
