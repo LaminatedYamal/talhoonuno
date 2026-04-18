@@ -43,9 +43,9 @@ function ExpensesPage() {
   const { t, lang } = useI18n();
   const currency = useCurrency();
   const dLocale = lang === "pt" ? ptLocale : enLocale;
-  const [preset, setPreset] = useState<PresetKey>("this_month");
   const [from, setFrom] = useState("");
   const [to, setTo] = useState("");
+  const [showAdvanced, setShowAdvanced] = useState(false);
   const [cat, setCat] = useState<ExpenseCategory | "all">("all");
   const [adding, setAdding] = useState(false);
   const [editing, setEditing] = useState<Expense | null>(null);
@@ -129,8 +129,8 @@ function ExpensesPage() {
 
       <Card>
         <CardContent className="p-4">
-          <div className="grid gap-3 md:grid-cols-5">
-            <div className="space-y-1">
+          <div className="flex flex-col gap-3 md:flex-row md:items-end">
+            <div className="space-y-1 flex-1">
               <Label className="text-xs">{t.common.category}</Label>
               <Select value={cat} onValueChange={(v) => setCat(v as ExpenseCategory | "all")}>
                 <SelectTrigger>
@@ -146,7 +146,7 @@ function ExpensesPage() {
                 </SelectContent>
               </Select>
             </div>
-            <div className="space-y-1">
+            <div className="space-y-1 md:w-[180px]">
               <Label className="text-xs">{t.reports.preset}</Label>
               <Select value={preset} onValueChange={(v) => setPreset(v as PresetKey)}>
                 <SelectTrigger>
@@ -160,33 +160,44 @@ function ExpensesPage() {
                   <SelectItem value="this_month">{t.reports.thisMonth}</SelectItem>
                   <SelectItem value="last_month">{t.reports.lastMonth}</SelectItem>
                   <SelectItem value="this_year">{t.reports.thisYear}</SelectItem>
-                  <SelectItem value="all">{t.expenses.allCategories /* all */}</SelectItem>
+                  <SelectItem value="all">{t.expenses.allCategories}</SelectItem>
                   <SelectItem value="custom">{t.reports.custom}</SelectItem>
                 </SelectContent>
               </Select>
             </div>
-            <div className="space-y-1">
-              <Label className="text-xs">{t.common.from}</Label>
-              <Input
-                type="date"
-                value={preset === "custom" ? from : range.from}
-                disabled={preset !== "custom"}
-                onChange={(e) => setFrom(e.target.value)}
-              />
-            </div>
-            <div className="space-y-1">
-              <Label className="text-xs">{t.common.to}</Label>
-              <Input
-                type="date"
-                value={preset === "custom" ? to : range.to}
-                disabled={preset !== "custom"}
-                onChange={(e) => setTo(e.target.value)}
-              />
-            </div>
-            <div className="space-y-1">
-              <Label className="text-xs">{t.common.count}</Label>
-              <div className="flex h-9 items-center rounded-md border bg-muted/40 px-3 text-sm font-semibold">
-                {filtered.length}
+
+            <Button 
+              variant="outline" 
+              className="md:hidden" 
+              onClick={() => setShowAdvanced(!showAdvanced)}
+            >
+              Filtros Avançados
+            </Button>
+
+            <div className={`flex flex-col gap-3 md:flex-row ${showAdvanced ? "flex" : "hidden md:flex"}`}>
+              <div className="space-y-1 md:w-[150px]">
+                <Label className="text-xs">{t.common.from}</Label>
+                <Input
+                  type="date"
+                  value={preset === "custom" ? from : range.from}
+                  disabled={preset !== "custom"}
+                  onChange={(e) => setFrom(e.target.value)}
+                />
+              </div>
+              <div className="space-y-1 md:w-[150px]">
+                <Label className="text-xs">{t.common.to}</Label>
+                <Input
+                  type="date"
+                  value={preset === "custom" ? to : range.to}
+                  disabled={preset !== "custom"}
+                  onChange={(e) => setTo(e.target.value)}
+                />
+              </div>
+              <div className="space-y-1 md:w-[80px]">
+                <Label className="text-xs">{t.common.count}</Label>
+                <div className="flex h-12 md:h-12 items-center justify-center rounded-md border bg-muted/40 px-3 text-sm font-semibold">
+                  {filtered.length}
+                </div>
               </div>
             </div>
           </div>
@@ -227,30 +238,35 @@ function ExpensesPage() {
                     {items.map((e) => (
                       <li
                         key={e.id}
-                        className="flex items-center gap-3 px-4 py-3 hover:bg-accent/40"
+                        className="flex flex-col md:flex-row md:items-center gap-3 px-4 py-4 hover:bg-accent/40"
                       >
-                        <Badge variant="secondary" className="shrink-0">
-                          {t.expenseCat[e.category]}
-                        </Badge>
+                        <div className="flex justify-between items-center w-full md:w-auto">
+                          <Badge variant="secondary" className="shrink-0">
+                            {t.expenseCat[e.category]}
+                          </Badge>
+                          <div className="font-bold text-lg md:hidden">{currency(e.amount)}</div>
+                        </div>
                         <div className="min-w-0 flex-1">
                           {e.notes ? (
-                            <div className="truncate text-sm">{e.notes}</div>
+                            <div className="text-sm bg-muted/30 p-2 rounded md:bg-transparent md:p-0 md:truncate">{e.notes}</div>
                           ) : (
                             <div className="text-sm text-muted-foreground">{t.expenses.noNotes}</div>
                           )}
                         </div>
-                        <div className="font-semibold">{currency(e.amount)}</div>
-                        <Button variant="ghost" size="icon" onClick={() => setEditing(e)}>
-                          <Pencil className="h-4 w-4" />
-                        </Button>
-                        <Button
-                          variant="ghost"
-                          size="icon"
-                          onClick={() => setDeleteId(e.id)}
-                          className="text-destructive hover:text-destructive"
-                        >
-                          <Trash2 className="h-4 w-4" />
-                        </Button>
+                        <div className="hidden md:block font-semibold">{currency(e.amount)}</div>
+                        <div className="flex justify-end gap-1 mt-2 md:mt-0 border-t md:border-t-0 pt-2 md:pt-0">
+                          <Button variant="ghost" size="icon" className="h-10 w-10" onClick={() => setEditing(e)}>
+                            <Pencil className="h-4 w-4" />
+                          </Button>
+                          <Button
+                            variant="ghost"
+                            size="icon"
+                            onClick={() => setDeleteId(e.id)}
+                            className="h-10 w-10 text-destructive hover:text-destructive"
+                          >
+                            <Trash2 className="h-4 w-4" />
+                          </Button>
+                        </div>
                       </li>
                     ))}
                   </ul>

@@ -89,24 +89,20 @@ function Dashboard() {
         </div>
       </div>
 
-      <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
+      <div className="grid grid-cols-2 gap-4 lg:grid-cols-4">
         <KpiCard
-          title={t.dashboard.revenueToday}
-          value={currency(stats.revToday)}
-          icon={<DollarSign className="h-4 w-4" />}
+          title={t.dashboard.profitToday}
+          value={currency(stats.profitToday)}
+          icon={<Wallet className="h-4 w-4" />}
           loading={loading}
+          tone={stats.profitToday >= 0 ? "success" : "warning"}
         />
         <KpiCard
-          title={t.dashboard.revenueWeek}
-          value={currency(stats.revWeek)}
-          icon={<TrendingUp className="h-4 w-4" />}
+          title={t.dashboard.profitMonth}
+          value={currency(stats.profitMonth)}
+          icon={<Wallet className="h-4 w-4" />}
           loading={loading}
-        />
-        <KpiCard
-          title={t.dashboard.revenueMonth}
-          value={currency(stats.revMonth)}
-          icon={<Receipt className="h-4 w-4" />}
-          loading={loading}
+          tone={stats.profitMonth >= 0 ? "success" : "warning"}
         />
         <KpiCard
           title={t.dashboard.outstanding}
@@ -115,16 +111,17 @@ function Dashboard() {
           tone="warning"
           loading={loading}
         />
+        <KpiCard
+          title={t.dashboard.toPay}
+          value={currency(stats.expMonth)}
+          icon={<AlertCircle className="h-4 w-4" />}
+          tone="warning"
+          loading={loading}
+        />
       </div>
 
-      <div className="grid gap-4 sm:grid-cols-3">
-        <ProfitCard label={t.dashboard.profitToday} value={currency(stats.profitToday)} positive={stats.profitToday >= 0} loading={loading} />
-        <ProfitCard label={t.dashboard.profitWeek} value={currency(stats.profitWeek)} positive={stats.profitWeek >= 0} loading={loading} />
-        <ProfitCard label={t.dashboard.profitMonth} value={currency(stats.profitMonth)} positive={stats.profitMonth >= 0} loading={loading} />
-      </div>
-
-      <div className="grid gap-4 lg:grid-cols-3">
-        <Card className="lg:col-span-2">
+      <div className="w-full">
+        <Card>
           <CardHeader>
             <CardTitle>{t.dashboard.trend}</CardTitle>
           </CardHeader>
@@ -159,44 +156,6 @@ function Dashboard() {
                   />
                 </AreaChart>
               </ResponsiveContainer>
-            </div>
-          </CardContent>
-        </Card>
-
-        <Card>
-          <CardHeader>
-            <CardTitle>{t.dashboard.paidVsUnpaid}</CardTitle>
-          </CardHeader>
-          <CardContent>
-            <div className="h-72">
-              {stats.paidCount + stats.unpaidCount === 0 ? (
-                <EmptyChart />
-              ) : (
-                <ResponsiveContainer width="100%" height="100%">
-                  <PieChart>
-                    <Pie
-                      data={paidPie}
-                      dataKey="value"
-                      nameKey="name"
-                      innerRadius={50}
-                      outerRadius={90}
-                      paddingAngle={2}
-                    >
-                      <Cell fill="var(--color-success)" />
-                      <Cell fill="var(--color-gold)" />
-                    </Pie>
-                    <Tooltip
-                      contentStyle={{
-                        background: "var(--color-card)",
-                        border: "1px solid var(--color-border)",
-                        borderRadius: 8,
-                        fontSize: 12,
-                      }}
-                    />
-                    <Legend />
-                  </PieChart>
-                </ResponsiveContainer>
-              )}
             </div>
           </CardContent>
         </Card>
@@ -244,12 +203,12 @@ function KpiCard({
       <CardContent className="p-5">
         <div className="flex items-center justify-between text-muted-foreground">
           <span className="text-xs font-medium uppercase tracking-wide">{title}</span>
-          <span className={tone === "warning" ? "text-warning" : "text-primary"}>{icon}</span>
+          <span className={tone === "warning" ? "text-warning" : tone === "success" ? "text-success" : "text-primary"}>{icon}</span>
         </div>
         {loading ? (
           <Skeleton className="mt-2 h-8 w-24" />
         ) : (
-          <div className={"mt-1 text-2xl font-bold " + (tone === "warning" ? "text-warning" : "")}>
+          <div className={"mt-1 text-2xl md:text-3xl font-bold " + (tone === "warning" ? "text-warning" : tone === "success" ? "text-success" : "")}>
             {value}
           </div>
         )}
@@ -258,46 +217,4 @@ function KpiCard({
   );
 }
 
-function ProfitCard({
-  label,
-  value,
-  positive,
-  loading,
-}: {
-  label: string;
-  value: string;
-  positive: boolean;
-  loading?: boolean;
-}) {
-  return (
-    <Card className="overflow-hidden">
-      <CardContent className="p-5">
-        <div className="flex items-center justify-between">
-          <span className="text-xs font-medium uppercase tracking-wide text-muted-foreground">
-            {label}
-          </span>
-          <Wallet className="h-4 w-4 text-muted-foreground" />
-        </div>
-        {loading ? (
-          <Skeleton className="mt-2 h-8 w-32" />
-        ) : (
-          <div
-            className={
-              "mt-1 text-2xl font-bold " + (positive ? "text-success" : "text-destructive")
-            }
-          >
-            {value}
-          </div>
-        )}
-      </CardContent>
-    </Card>
-  );
-}
 
-function EmptyChart() {
-  return (
-    <div className="flex h-full items-center justify-center text-sm text-muted-foreground">
-      —
-    </div>
-  );
-}

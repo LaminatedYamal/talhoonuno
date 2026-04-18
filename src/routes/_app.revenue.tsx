@@ -60,6 +60,7 @@ function RevenuePage() {
   const [from, setFrom] = useState("");
   const [to, setTo] = useState("");
   const [sort, setSort] = useState<SortKey>("date_desc");
+  const [showAdvanced, setShowAdvanced] = useState(false);
   const [editing, setEditing] = useState<Invoice | null>(null);
   const [adding, setAdding] = useState(false);
   const [deleteId, setDeleteId] = useState<string | null>(null);
@@ -131,21 +132,15 @@ function RevenuePage() {
         </Button>
       </div>
 
-      <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
+      <div className="grid grid-cols-2 gap-3">
         <SmallStat label={t.common.total} value={currency(total)} />
         <SmallStat label={t.dashboard.outstanding} value={currency(unpaid)} tone="warning" />
-        <SmallStat label={t.common.count} value={String(filtered.length)} />
-        <SmallStat
-          label={t.revenue.paid}
-          value={String(filtered.filter((r) => r.paid).length)}
-          tone="success"
-        />
       </div>
 
       <Card>
         <CardContent className="p-4">
-          <div className="grid gap-3 md:grid-cols-6">
-            <div className="space-y-1 md:col-span-2">
+          <div className="flex flex-col gap-3 md:flex-row md:items-end">
+            <div className="space-y-1 flex-1">
               <Label className="text-xs">{t.common.search}</Label>
               <div className="relative">
                 <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
@@ -157,7 +152,7 @@ function RevenuePage() {
                 />
               </div>
             </div>
-            <div className="space-y-1">
+            <div className="space-y-1 md:w-[180px]">
               <Label className="text-xs">{t.common.status}</Label>
               <Select value={status} onValueChange={(v) => setStatus(v as StatusFilter)}>
                 <SelectTrigger>
@@ -170,7 +165,7 @@ function RevenuePage() {
                 </SelectContent>
               </Select>
             </div>
-            <div className="space-y-1">
+            <div className="space-y-1 md:w-[180px]">
               <Label className="text-xs">{t.reports.preset}</Label>
               <Select value={preset} onValueChange={(v) => setPreset(v as PresetKey)}>
                 <SelectTrigger>
@@ -189,23 +184,34 @@ function RevenuePage() {
                 </SelectContent>
               </Select>
             </div>
-            <div className="space-y-1">
-              <Label className="text-xs">{t.common.from}</Label>
-              <Input
-                type="date"
-                value={preset === "custom" ? from : range.from}
-                disabled={preset !== "custom"}
-                onChange={(e) => setFrom(e.target.value)}
-              />
-            </div>
-            <div className="space-y-1">
-              <Label className="text-xs">{t.common.to}</Label>
-              <Input
-                type="date"
-                value={preset === "custom" ? to : range.to}
-                disabled={preset !== "custom"}
-                onChange={(e) => setTo(e.target.value)}
-              />
+            
+            <Button 
+              variant="outline" 
+              className="md:hidden" 
+              onClick={() => setShowAdvanced(!showAdvanced)}
+            >
+              Filtros Avançados
+            </Button>
+
+            <div className={`flex flex-col gap-3 md:flex-row ${showAdvanced ? "flex" : "hidden md:flex"}`}>
+              <div className="space-y-1 md:w-[150px]">
+                <Label className="text-xs">{t.common.from}</Label>
+                <Input
+                  type="date"
+                  value={preset === "custom" ? from : range.from}
+                  disabled={preset !== "custom"}
+                  onChange={(e) => setFrom(e.target.value)}
+                />
+              </div>
+              <div className="space-y-1 md:w-[150px]">
+                <Label className="text-xs">{t.common.to}</Label>
+                <Input
+                  type="date"
+                  value={preset === "custom" ? to : range.to}
+                  disabled={preset !== "custom"}
+                  onChange={(e) => setTo(e.target.value)}
+                />
+              </div>
             </div>
           </div>
           <div className="mt-3 flex justify-end">
@@ -237,68 +243,130 @@ function RevenuePage() {
               </Button>
             </div>
           ) : (
-            <Table>
-              <TableHeader>
-                <TableRow>
-                  <TableHead>{t.common.customer}</TableHead>
-                  <TableHead>{t.common.date}</TableHead>
-                  <TableHead className="text-right">{t.common.amount}</TableHead>
-                  <TableHead className="text-center">{t.revenue.paid}</TableHead>
-                  <TableHead className="text-right">{t.common.actions}</TableHead>
-                </TableRow>
-              </TableHeader>
-              <TableBody>
+            <div className="w-full">
+              {/* Mobile Card View */}
+              <div className="grid grid-cols-1 gap-3 p-4 md:hidden">
                 {filtered.map((inv) => (
-                  <TableRow key={inv.id}>
-                    <TableCell>
-                      <div className="font-medium">{inv.customer_name}</div>
+                  <Card key={inv.id} className="overflow-hidden">
+                    <CardContent className="p-4 flex flex-col gap-3">
+                      <div className="flex justify-between items-start">
+                        <div>
+                          <div className="font-semibold">{inv.customer_name}</div>
+                          <div className="text-xs text-muted-foreground">
+                            {format(parseISO(inv.invoice_date), "PP", { locale: dLocale })}
+                          </div>
+                        </div>
+                        <div className="text-lg font-bold">{currency(inv.amount)}</div>
+                      </div>
+                      
                       {inv.notes && (
-                        <div className="line-clamp-1 text-xs text-muted-foreground">
+                        <div className="text-sm text-muted-foreground bg-muted/50 p-2 rounded-md">
                           {inv.notes}
                         </div>
                       )}
-                    </TableCell>
-                    <TableCell className="text-sm text-muted-foreground">
-                      {format(parseISO(inv.invoice_date), "PP", { locale: dLocale })}
-                    </TableCell>
-                    <TableCell className="text-right font-semibold">
-                      {currency(inv.amount)}
-                    </TableCell>
-                    <TableCell className="text-center">
-                      <div className="inline-flex items-center gap-2">
-                        <Switch
-                          checked={inv.paid}
-                          onCheckedChange={(v) => togglePaid.mutate({ id: inv.id, paid: v })}
-                        />
-                        <Badge
-                          variant="outline"
-                          className={
-                            inv.paid
-                              ? "border-success/30 bg-success/10 text-success"
-                              : "border-warning/30 bg-warning/10 text-warning"
-                          }
-                        >
-                          {inv.paid ? t.revenue.paid : t.revenue.unpaid}
-                        </Badge>
+                      
+                      <div className="flex items-center justify-between pt-2 border-t mt-1">
+                        <div className="flex items-center gap-2">
+                          <Switch
+                            checked={inv.paid}
+                            onCheckedChange={(v) => togglePaid.mutate({ id: inv.id, paid: v })}
+                          />
+                          <Badge
+                            variant="outline"
+                            className={
+                              inv.paid
+                                ? "border-success/30 bg-success/10 text-success"
+                                : "border-warning/30 bg-warning/10 text-warning"
+                            }
+                          >
+                            {inv.paid ? t.revenue.paid : t.revenue.unpaid}
+                          </Badge>
+                        </div>
+                        <div className="flex gap-1">
+                          <Button variant="ghost" size="icon" className="h-10 w-10" onClick={() => setEditing(inv)}>
+                            <Pencil className="h-4 w-4" />
+                          </Button>
+                          <Button
+                            variant="ghost"
+                            size="icon"
+                            className="h-10 w-10 text-destructive hover:text-destructive"
+                            onClick={() => setDeleteId(inv.id)}
+                          >
+                            <Trash2 className="h-4 w-4" />
+                          </Button>
+                        </div>
                       </div>
-                    </TableCell>
-                    <TableCell className="text-right">
-                      <Button variant="ghost" size="icon" onClick={() => setEditing(inv)}>
-                        <Pencil className="h-4 w-4" />
-                      </Button>
-                      <Button
-                        variant="ghost"
-                        size="icon"
-                        onClick={() => setDeleteId(inv.id)}
-                        className="text-destructive hover:text-destructive"
-                      >
-                        <Trash2 className="h-4 w-4" />
-                      </Button>
-                    </TableCell>
-                  </TableRow>
+                    </CardContent>
+                  </Card>
                 ))}
-              </TableBody>
-            </Table>
+              </div>
+
+              {/* Desktop Table View */}
+              <div className="hidden md:block w-full">
+                <Table>
+                  <TableHeader>
+                    <TableRow>
+                      <TableHead>{t.common.customer}</TableHead>
+                      <TableHead>{t.common.date}</TableHead>
+                      <TableHead className="text-right">{t.common.amount}</TableHead>
+                      <TableHead className="text-center">{t.revenue.paid}</TableHead>
+                      <TableHead className="text-right">{t.common.actions}</TableHead>
+                    </TableRow>
+                  </TableHeader>
+                  <TableBody>
+                    {filtered.map((inv) => (
+                      <TableRow key={inv.id}>
+                        <TableCell>
+                          <div className="font-medium">{inv.customer_name}</div>
+                          {inv.notes && (
+                            <div className="line-clamp-1 text-xs text-muted-foreground">
+                              {inv.notes}
+                            </div>
+                          )}
+                        </TableCell>
+                        <TableCell className="text-sm text-muted-foreground">
+                          {format(parseISO(inv.invoice_date), "PP", { locale: dLocale })}
+                        </TableCell>
+                        <TableCell className="text-right font-semibold">
+                          {currency(inv.amount)}
+                        </TableCell>
+                        <TableCell className="text-center">
+                          <div className="inline-flex items-center gap-2">
+                            <Switch
+                              checked={inv.paid}
+                              onCheckedChange={(v) => togglePaid.mutate({ id: inv.id, paid: v })}
+                            />
+                            <Badge
+                              variant="outline"
+                              className={
+                                inv.paid
+                                  ? "border-success/30 bg-success/10 text-success"
+                                  : "border-warning/30 bg-warning/10 text-warning"
+                              }
+                            >
+                              {inv.paid ? t.revenue.paid : t.revenue.unpaid}
+                            </Badge>
+                          </div>
+                        </TableCell>
+                        <TableCell className="text-right">
+                          <Button variant="ghost" size="icon" onClick={() => setEditing(inv)}>
+                            <Pencil className="h-4 w-4" />
+                          </Button>
+                          <Button
+                            variant="ghost"
+                            size="icon"
+                            onClick={() => setDeleteId(inv.id)}
+                            className="text-destructive hover:text-destructive"
+                          >
+                            <Trash2 className="h-4 w-4" />
+                          </Button>
+                        </TableCell>
+                      </TableRow>
+                    ))}
+                  </TableBody>
+                </Table>
+              </div>
+            </div>
           )}
         </CardContent>
       </Card>

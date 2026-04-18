@@ -216,20 +216,6 @@ function ReportsPage() {
         />
       </div>
 
-      <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
-        <SmallStat label={t.reports.paid} value={currency(totals.paid)} tone="success" />
-        <SmallStat label={t.reports.unpaid} value={currency(totals.unpaid)} tone="warning" />
-        <SmallStat label={t.reports.avgPerDay + " · " + t.reports.revenue} value={currency(totals.avgRevPerDay)} />
-        <SmallStat label={t.reports.avgPerDay + " · " + t.reports.expenses} value={currency(totals.avgExpPerDay)} />
-        <SmallStat label={t.reports.txCount} value={String(totals.txCount)} />
-        <SmallStat label={t.reports.avgRev} value={currency(totals.avgRev)} />
-        <SmallStat label={t.reports.avgExp} value={currency(totals.avgExp)} />
-        <SmallStat
-          label={t.reports.avgPerDay + " · " + t.reports.profit}
-          value={currency(totals.avgProfitPerDay)}
-          tone={totals.avgProfitPerDay >= 0 ? "success" : "destructive"}
-        />
-      </div>
 
       <Card>
         <CardHeader>
@@ -363,7 +349,7 @@ function SummaryCard({
         </div>
         <div
           className={
-            "mt-1 text-2xl font-bold " +
+            "mt-1 text-3xl font-black " +
             (tone === "success" ? "text-success" : tone === "destructive" ? "text-destructive" : "")
           }
         >
