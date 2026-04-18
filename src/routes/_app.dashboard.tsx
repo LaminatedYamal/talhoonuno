@@ -17,8 +17,14 @@ import { Plus, Receipt, Wallet, TrendingUp, AlertCircle, DollarSign } from "luci
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Skeleton } from "@/components/ui/skeleton";
-import { useInvoices, useExpenses, useDateRanges, sumInRange, trendLast30Days } from "@/lib/data-hooks";
-import { currency } from "@/lib/format";
+import {
+  useInvoices,
+  useExpenses,
+  useDateRanges,
+  sumInRange,
+  trendLast30Days,
+} from "@/lib/data-hooks";
+import { useCurrency, useI18n } from "@/i18n/I18nProvider";
 import { InvoiceDialog } from "@/components/InvoiceDialog";
 import { ExpenseDialog } from "@/components/ExpenseDialog";
 
@@ -30,6 +36,8 @@ function Dashboard() {
   const { data: invoices, isLoading: li } = useInvoices();
   const { data: expenses, isLoading: le } = useExpenses();
   const r = useDateRanges();
+  const { t } = useI18n();
+  const currency = useCurrency();
   const [invoiceOpen, setInvoiceOpen] = useState(false);
   const [expenseOpen, setExpenseOpen] = useState(false);
 
@@ -58,8 +66,8 @@ function Dashboard() {
 
   const trend = useMemo(() => trendLast30Days(invoices, expenses), [invoices, expenses]);
   const paidPie = [
-    { name: "Paid", value: stats.paidCount },
-    { name: "Unpaid", value: stats.unpaidCount },
+    { name: t.revenue.paid, value: stats.paidCount },
+    { name: t.revenue.unpaid, value: stats.unpaidCount },
   ];
 
   const loading = li || le;
@@ -68,62 +76,57 @@ function Dashboard() {
     <div className="space-y-6">
       <div className="flex flex-wrap items-center justify-between gap-3">
         <div>
-          <h1 className="text-2xl font-bold tracking-tight">Dashboard</h1>
-          <p className="text-sm text-muted-foreground">
-            Today's revenue, profit and outstanding invoices.
-          </p>
+          <h1 className="text-2xl font-bold tracking-tight">{t.dashboard.title}</h1>
+          <p className="text-sm text-muted-foreground">{t.dashboard.subtitle}</p>
         </div>
         <div className="flex gap-2">
           <Button variant="outline" onClick={() => setExpenseOpen(true)}>
-            <Plus className="h-4 w-4" /> Expense
+            <Plus className="h-4 w-4" /> {t.dashboard.newExpense}
           </Button>
           <Button onClick={() => setInvoiceOpen(true)}>
-            <Plus className="h-4 w-4" /> Invoice
+            <Plus className="h-4 w-4" /> {t.dashboard.newRevenue}
           </Button>
         </div>
       </div>
 
-      {/* Top KPI cards */}
       <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
         <KpiCard
-          title="Revenue today"
-          value={stats.revToday}
+          title={t.dashboard.revenueToday}
+          value={currency(stats.revToday)}
           icon={<DollarSign className="h-4 w-4" />}
           loading={loading}
         />
         <KpiCard
-          title="Revenue this week"
-          value={stats.revWeek}
+          title={t.dashboard.revenueWeek}
+          value={currency(stats.revWeek)}
           icon={<TrendingUp className="h-4 w-4" />}
           loading={loading}
         />
         <KpiCard
-          title="Revenue this month"
-          value={stats.revMonth}
+          title={t.dashboard.revenueMonth}
+          value={currency(stats.revMonth)}
           icon={<Receipt className="h-4 w-4" />}
           loading={loading}
         />
         <KpiCard
-          title="Outstanding"
-          value={stats.outstanding}
+          title={t.dashboard.outstanding}
+          value={currency(stats.outstanding)}
           icon={<AlertCircle className="h-4 w-4" />}
           tone="warning"
           loading={loading}
         />
       </div>
 
-      {/* Profit cards */}
       <div className="grid gap-4 sm:grid-cols-3">
-        <ProfitCard label="Profit today" value={stats.profitToday} loading={loading} />
-        <ProfitCard label="Profit this week" value={stats.profitWeek} loading={loading} />
-        <ProfitCard label="Profit this month" value={stats.profitMonth} loading={loading} />
+        <ProfitCard label={t.dashboard.profitToday} value={currency(stats.profitToday)} positive={stats.profitToday >= 0} loading={loading} />
+        <ProfitCard label={t.dashboard.profitWeek} value={currency(stats.profitWeek)} positive={stats.profitWeek >= 0} loading={loading} />
+        <ProfitCard label={t.dashboard.profitMonth} value={currency(stats.profitMonth)} positive={stats.profitMonth >= 0} loading={loading} />
       </div>
 
-      {/* Charts */}
       <div className="grid gap-4 lg:grid-cols-3">
         <Card className="lg:col-span-2">
           <CardHeader>
-            <CardTitle>Revenue trend — last 30 days</CardTitle>
+            <CardTitle>{t.dashboard.trend}</CardTitle>
           </CardHeader>
           <CardContent>
             <div className="h-72">
@@ -162,7 +165,7 @@ function Dashboard() {
 
         <Card>
           <CardHeader>
-            <CardTitle>Paid vs unpaid</CardTitle>
+            <CardTitle>{t.dashboard.paidVsUnpaid}</CardTitle>
           </CardHeader>
           <CardContent>
             <div className="h-72">
@@ -180,7 +183,7 @@ function Dashboard() {
                       paddingAngle={2}
                     >
                       <Cell fill="var(--color-success)" />
-                      <Cell fill="var(--color-warning)" />
+                      <Cell fill="var(--color-gold)" />
                     </Pie>
                     <Tooltip
                       contentStyle={{
@@ -203,16 +206,14 @@ function Dashboard() {
         <Card className="border-dashed">
           <CardContent className="flex flex-col items-center justify-center gap-3 py-12 text-center">
             <Receipt className="h-10 w-10 text-muted-foreground" />
-            <h3 className="text-lg font-semibold">No invoices yet</h3>
-            <p className="max-w-md text-sm text-muted-foreground">
-              Add your first invoice to start tracking revenue and profit.
-            </p>
+            <h3 className="text-lg font-semibold">{t.dashboard.noInvoices}</h3>
+            <p className="max-w-md text-sm text-muted-foreground">{t.dashboard.addFirst}</p>
             <div className="flex gap-2">
               <Button onClick={() => setInvoiceOpen(true)}>
-                <Plus className="h-4 w-4" /> Add invoice
+                <Plus className="h-4 w-4" /> {t.dashboard.addRevenue}
               </Button>
               <Button variant="outline" asChild>
-                <Link to="/invoices">View invoices</Link>
+                <Link to="/revenue">{t.dashboard.viewRevenue}</Link>
               </Button>
             </div>
           </CardContent>
@@ -233,7 +234,7 @@ function KpiCard({
   loading,
 }: {
   title: string;
-  value: number;
+  value: string;
   icon: React.ReactNode;
   tone?: "warning";
   loading?: boolean;
@@ -243,13 +244,13 @@ function KpiCard({
       <CardContent className="p-5">
         <div className="flex items-center justify-between text-muted-foreground">
           <span className="text-xs font-medium uppercase tracking-wide">{title}</span>
-          <span className={tone === "warning" ? "text-warning" : ""}>{icon}</span>
+          <span className={tone === "warning" ? "text-warning" : "text-primary"}>{icon}</span>
         </div>
         {loading ? (
           <Skeleton className="mt-2 h-8 w-24" />
         ) : (
           <div className={"mt-1 text-2xl font-bold " + (tone === "warning" ? "text-warning" : "")}>
-            {currency(value)}
+            {value}
           </div>
         )}
       </CardContent>
@@ -260,13 +261,14 @@ function KpiCard({
 function ProfitCard({
   label,
   value,
+  positive,
   loading,
 }: {
   label: string;
-  value: number;
+  value: string;
+  positive: boolean;
   loading?: boolean;
 }) {
-  const positive = value >= 0;
   return (
     <Card className="overflow-hidden">
       <CardContent className="p-5">
@@ -284,7 +286,7 @@ function ProfitCard({
               "mt-1 text-2xl font-bold " + (positive ? "text-success" : "text-destructive")
             }
           >
-            {currency(value)}
+            {value}
           </div>
         )}
       </CardContent>
@@ -295,7 +297,7 @@ function ProfitCard({
 function EmptyChart() {
   return (
     <div className="flex h-full items-center justify-center text-sm text-muted-foreground">
-      No invoices yet
+      —
     </div>
   );
 }

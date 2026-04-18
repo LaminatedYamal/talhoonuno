@@ -1,6 +1,13 @@
 import { createFileRoute } from "@tanstack/react-router";
 import { useMemo, useState } from "react";
-import { format, parseISO, startOfMonth, endOfMonth } from "date-fns";
+import {
+  format,
+  parseISO,
+  startOfWeek,
+  startOfMonth,
+  differenceInCalendarDays,
+} from "date-fns";
+import { pt as ptLocale, enUS as enLocale } from "date-fns/locale";
 import {
   ResponsiveContainer,
   BarChart,
@@ -10,28 +17,57 @@ import {
   Tooltip,
   CartesianGrid,
   Legend,
+  LineChart,
+  Line,
 } from "recharts";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
 import { useInvoices, useExpenses } from "@/lib/data-hooks";
-import { currency, expenseCategoryLabel } from "@/lib/format";
+import { useCurrency, useI18n } from "@/i18n/I18nProvider";
+import { datePresets, type PresetKey } from "@/lib/date-presets";
+import { type ExpenseCategory } from "@/lib/format";
 
 export const Route = createFileRoute("/_app/reports")({
   component: ReportsPage,
 });
 
+type Group = "day" | "week" | "month";
+
 function ReportsPage() {
   const { data: invoices } = useInvoices();
   const { data: expenses } = useExpenses();
-  const [from, setFrom] = useState(() => format(startOfMonth(new Date()), "yyyy-MM-dd"));
-  const [to, setTo] = useState(() => format(endOfMonth(new Date()), "yyyy-MM-dd"));
+  const { t, lang } = useI18n();
+  const currency = useCurrency();
+  const dLocale = lang === "pt" ? ptLocale : enLocale;
+
+  const [preset, setPreset] = useState<PresetKey>("this_month");
+  const initial = datePresets["this_month"]();
+  const [from, setFrom] = useState(initial.from);
+  const [to, setTo] = useState(initial.to);
+  const [group, setGroup] = useState<Group>("day");
+
+  const range = useMemo(() => {
+    if (preset === "custom") return { from, to };
+    return datePresets[preset]();
+  }, [preset, from, to]);
 
   const inRange = useMemo(() => {
-    const inv = (invoices ?? []).filter((i) => i.invoice_date >= from && i.invoice_date <= to);
-    const exp = (expenses ?? []).filter((e) => e.expense_date >= from && e.expense_date <= to);
+    const inv = (invoices ?? []).filter(
+      (i) => i.invoice_date >= range.from && i.invoice_date <= range.to,
+    );
+    const exp = (expenses ?? []).filter(
+      (e) => e.expense_date >= range.from && e.expense_date <= range.to,
+    );
     return { inv, exp };
-  }, [invoices, expenses, from, to]);
+  }, [invoices, expenses, range]);
 
   const totals = useMemo(() => {
     const revenue = inRange.inv.reduce((a, i) => a + i.amount, 0);
@@ -40,106 +76,174 @@ function ReportsPage() {
     const margin = revenue > 0 ? (profit / revenue) * 100 : 0;
     const paid = inRange.inv.filter((i) => i.paid).reduce((a, i) => a + i.amount, 0);
     const unpaid = revenue - paid;
-    return { revenue, exp, profit, margin, paid, unpaid };
-  }, [inRange]);
+    const days = Math.max(
+      1,
+      differenceInCalendarDays(parseISO(range.to), parseISO(range.from)) + 1,
+    );
+    return {
+      revenue,
+      exp,
+      profit,
+      margin,
+      paid,
+      unpaid,
+      avgRevPerDay: revenue / days,
+      avgExpPerDay: exp / days,
+      avgProfitPerDay: profit / days,
+      txCount: inRange.inv.length + inRange.exp.length,
+      avgRev: inRange.inv.length ? revenue / inRange.inv.length : 0,
+      avgExp: inRange.exp.length ? exp / inRange.exp.length : 0,
+    };
+  }, [inRange, range]);
 
   const byCategory = useMemo(() => {
     const m = new Map<string, number>();
     inRange.exp.forEach((e) => m.set(e.category, (m.get(e.category) ?? 0) + e.amount));
     return Array.from(m.entries())
-      .map(([k, v]) => ({ category: expenseCategoryLabel(k), amount: v }))
+      .map(([k, v]) => ({ category: t.expenseCat[k as ExpenseCategory], amount: v }))
       .sort((a, b) => b.amount - a.amount);
-  }, [inRange]);
+  }, [inRange, t]);
 
-  const daily = useMemo(() => {
-    const map = new Map<string, { date: string; revenue: number; expenses: number }>();
+  const grouped = useMemo(() => {
+    const bucket = (iso: string) => {
+      const d = parseISO(iso);
+      if (group === "week") return format(startOfWeek(d, { weekStartsOn: 1 }), "yyyy-MM-dd");
+      if (group === "month") return format(startOfMonth(d), "yyyy-MM");
+      return iso;
+    };
+    const labelFor = (key: string) => {
+      if (group === "month") return format(parseISO(key + "-01"), "MMM yyyy", { locale: dLocale });
+      if (group === "week") return format(parseISO(key), "d MMM", { locale: dLocale });
+      return format(parseISO(key), "d MMM", { locale: dLocale });
+    };
+    const map = new Map<
+      string,
+      { key: string; label: string; revenue: number; expenses: number; profit: number }
+    >();
     inRange.inv.forEach((i) => {
-      const e = map.get(i.invoice_date) ?? { date: i.invoice_date, revenue: 0, expenses: 0 };
+      const k = bucket(i.invoice_date);
+      const e = map.get(k) ?? { key: k, label: labelFor(k), revenue: 0, expenses: 0, profit: 0 };
       e.revenue += i.amount;
-      map.set(i.invoice_date, e);
+      map.set(k, e);
     });
     inRange.exp.forEach((x) => {
-      const e = map.get(x.expense_date) ?? { date: x.expense_date, revenue: 0, expenses: 0 };
+      const k = bucket(x.expense_date);
+      const e = map.get(k) ?? { key: k, label: labelFor(k), revenue: 0, expenses: 0, profit: 0 };
       e.expenses += x.amount;
-      map.set(x.expense_date, e);
+      map.set(k, e);
     });
-    return Array.from(map.values())
-      .sort((a, b) => a.date.localeCompare(b.date))
-      .map((d) => ({ ...d, label: format(parseISO(d.date), "MMM d") }));
-  }, [inRange]);
+    const arr = Array.from(map.values()).sort((a, b) => a.key.localeCompare(b.key));
+    arr.forEach((d) => (d.profit = d.revenue - d.expenses));
+    return arr;
+  }, [inRange, group, dLocale]);
 
   return (
     <div className="space-y-6">
       <div>
-        <h1 className="text-2xl font-bold tracking-tight">Reports</h1>
-        <p className="text-sm text-muted-foreground">
-          Revenue, expenses, profit and margin for any date range.
-        </p>
+        <h1 className="text-2xl font-bold tracking-tight">{t.reports.title}</h1>
+        <p className="text-sm text-muted-foreground">{t.reports.subtitle}</p>
       </div>
 
       <Card>
         <CardContent className="p-4">
-          <div className="grid gap-3 md:grid-cols-2">
+          <div className="grid gap-3 md:grid-cols-4">
             <div className="space-y-1">
-              <Label htmlFor="rfrom">From</Label>
+              <Label className="text-xs">{t.reports.preset}</Label>
+              <Select value={preset} onValueChange={(v) => setPreset(v as PresetKey)}>
+                <SelectTrigger>
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="today">{t.reports.today}</SelectItem>
+                  <SelectItem value="yesterday">{t.reports.yesterday}</SelectItem>
+                  <SelectItem value="this_week">{t.reports.thisWeek}</SelectItem>
+                  <SelectItem value="last_week">{t.reports.lastWeek}</SelectItem>
+                  <SelectItem value="this_month">{t.reports.thisMonth}</SelectItem>
+                  <SelectItem value="last_month">{t.reports.lastMonth}</SelectItem>
+                  <SelectItem value="this_year">{t.reports.thisYear}</SelectItem>
+                  <SelectItem value="all">{t.expenses.allCategories /* all */}</SelectItem>
+                  <SelectItem value="custom">{t.reports.custom}</SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
+            <div className="space-y-1">
+              <Label className="text-xs">{t.common.from}</Label>
               <Input
-                id="rfrom"
                 type="date"
-                value={from}
+                value={preset === "custom" ? from : range.from}
+                disabled={preset !== "custom"}
                 onChange={(e) => setFrom(e.target.value)}
               />
             </div>
             <div className="space-y-1">
-              <Label htmlFor="rto">To</Label>
-              <Input id="rto" type="date" value={to} onChange={(e) => setTo(e.target.value)} />
+              <Label className="text-xs">{t.common.to}</Label>
+              <Input
+                type="date"
+                value={preset === "custom" ? to : range.to}
+                disabled={preset !== "custom"}
+                onChange={(e) => setTo(e.target.value)}
+              />
+            </div>
+            <div className="space-y-1">
+              <Label className="text-xs">{t.reports.grouping}</Label>
+              <Select value={group} onValueChange={(v) => setGroup(v as Group)}>
+                <SelectTrigger>
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="day">{t.reports.day}</SelectItem>
+                  <SelectItem value="week">{t.reports.week}</SelectItem>
+                  <SelectItem value="month">{t.reports.month}</SelectItem>
+                </SelectContent>
+              </Select>
             </div>
           </div>
         </CardContent>
       </Card>
 
       <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
-        <SummaryCard label="Revenue" value={currency(totals.revenue)} />
-        <SummaryCard label="Expenses" value={currency(totals.exp)} />
+        <SummaryCard label={t.reports.revenue} value={currency(totals.revenue)} />
+        <SummaryCard label={t.reports.expenses} value={currency(totals.exp)} />
         <SummaryCard
-          label="Profit"
+          label={t.reports.profit}
           value={currency(totals.profit)}
           tone={totals.profit >= 0 ? "success" : "destructive"}
         />
         <SummaryCard
-          label="Margin"
+          label={t.reports.margin}
           value={totals.revenue > 0 ? `${totals.margin.toFixed(1)}%` : "—"}
           tone={totals.profit >= 0 ? "success" : "destructive"}
         />
       </div>
 
-      <div className="grid gap-3 sm:grid-cols-2">
-        <Card>
-          <CardContent className="p-4">
-            <div className="text-xs uppercase text-muted-foreground">Paid invoices</div>
-            <div className="mt-1 text-xl font-bold text-success">{currency(totals.paid)}</div>
-          </CardContent>
-        </Card>
-        <Card>
-          <CardContent className="p-4">
-            <div className="text-xs uppercase text-muted-foreground">Unpaid invoices</div>
-            <div className="mt-1 text-xl font-bold text-warning">{currency(totals.unpaid)}</div>
-          </CardContent>
-        </Card>
+      <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
+        <SmallStat label={t.reports.paid} value={currency(totals.paid)} tone="success" />
+        <SmallStat label={t.reports.unpaid} value={currency(totals.unpaid)} tone="warning" />
+        <SmallStat label={t.reports.avgPerDay + " · " + t.reports.revenue} value={currency(totals.avgRevPerDay)} />
+        <SmallStat label={t.reports.avgPerDay + " · " + t.reports.expenses} value={currency(totals.avgExpPerDay)} />
+        <SmallStat label={t.reports.txCount} value={String(totals.txCount)} />
+        <SmallStat label={t.reports.avgRev} value={currency(totals.avgRev)} />
+        <SmallStat label={t.reports.avgExp} value={currency(totals.avgExp)} />
+        <SmallStat
+          label={t.reports.avgPerDay + " · " + t.reports.profit}
+          value={currency(totals.avgProfitPerDay)}
+          tone={totals.avgProfitPerDay >= 0 ? "success" : "destructive"}
+        />
       </div>
 
       <Card>
         <CardHeader>
-          <CardTitle>Daily revenue vs expenses</CardTitle>
+          <CardTitle>{t.reports.revVsExp}</CardTitle>
         </CardHeader>
         <CardContent>
           <div className="h-80">
-            {daily.length === 0 ? (
+            {grouped.length === 0 ? (
               <div className="flex h-full items-center justify-center text-sm text-muted-foreground">
-                No data in this range
+                {t.common.noData}
               </div>
             ) : (
               <ResponsiveContainer width="100%" height="100%">
-                <BarChart data={daily} margin={{ left: 0, right: 8, top: 8, bottom: 0 }}>
+                <BarChart data={grouped} margin={{ left: 0, right: 8, top: 8, bottom: 0 }}>
                   <CartesianGrid strokeDasharray="3 3" stroke="var(--color-border)" />
                   <XAxis dataKey="label" tick={{ fontSize: 11 }} interval="preserveStartEnd" />
                   <YAxis tick={{ fontSize: 11 }} width={50} />
@@ -153,8 +257,8 @@ function ReportsPage() {
                     formatter={(v) => currency(Number(v))}
                   />
                   <Legend />
-                  <Bar dataKey="revenue" name="Revenue" fill="var(--color-primary)" radius={4} />
-                  <Bar dataKey="expenses" name="Expenses" fill="var(--color-warning)" radius={4} />
+                  <Bar dataKey="revenue" name={t.reports.revenue} fill="var(--color-primary)" radius={4} />
+                  <Bar dataKey="expenses" name={t.reports.expenses} fill="var(--color-gold)" radius={4} />
                 </BarChart>
               </ResponsiveContainer>
             )}
@@ -164,12 +268,53 @@ function ReportsPage() {
 
       <Card>
         <CardHeader>
-          <CardTitle>Expenses by category</CardTitle>
+          <CardTitle>{t.reports.profit}</CardTitle>
+        </CardHeader>
+        <CardContent>
+          <div className="h-72">
+            {grouped.length === 0 ? (
+              <div className="flex h-full items-center justify-center text-sm text-muted-foreground">
+                {t.common.noData}
+              </div>
+            ) : (
+              <ResponsiveContainer width="100%" height="100%">
+                <LineChart data={grouped} margin={{ left: 0, right: 8, top: 8, bottom: 0 }}>
+                  <CartesianGrid strokeDasharray="3 3" stroke="var(--color-border)" />
+                  <XAxis dataKey="label" tick={{ fontSize: 11 }} interval="preserveStartEnd" />
+                  <YAxis tick={{ fontSize: 11 }} width={50} />
+                  <Tooltip
+                    contentStyle={{
+                      background: "var(--color-card)",
+                      border: "1px solid var(--color-border)",
+                      borderRadius: 8,
+                      fontSize: 12,
+                    }}
+                    formatter={(v) => currency(Number(v))}
+                  />
+                  <Legend />
+                  <Line
+                    type="monotone"
+                    dataKey="profit"
+                    name={t.reports.profit}
+                    stroke="var(--color-primary-glow)"
+                    strokeWidth={2}
+                    dot={false}
+                  />
+                </LineChart>
+              </ResponsiveContainer>
+            )}
+          </div>
+        </CardContent>
+      </Card>
+
+      <Card>
+        <CardHeader>
+          <CardTitle>{t.reports.byCategory}</CardTitle>
         </CardHeader>
         <CardContent>
           {byCategory.length === 0 ? (
             <p className="py-8 text-center text-sm text-muted-foreground">
-              No expenses in this range
+              {t.reports.noneCategory}
             </p>
           ) : (
             <ul className="divide-y">
@@ -188,7 +333,7 @@ function ReportsPage() {
                       />
                     </div>
                     <div className="mt-1 text-xs text-muted-foreground">
-                      {pct.toFixed(1)}% of expenses
+                      {pct.toFixed(1)}% {t.reports.ofExpenses}
                     </div>
                   </li>
                 );
@@ -220,6 +365,38 @@ function SummaryCard({
           className={
             "mt-1 text-2xl font-bold " +
             (tone === "success" ? "text-success" : tone === "destructive" ? "text-destructive" : "")
+          }
+        >
+          {value}
+        </div>
+      </CardContent>
+    </Card>
+  );
+}
+
+function SmallStat({
+  label,
+  value,
+  tone,
+}: {
+  label: string;
+  value: string;
+  tone?: "success" | "warning" | "destructive";
+}) {
+  return (
+    <Card>
+      <CardContent className="p-4">
+        <div className="text-[11px] uppercase tracking-wide text-muted-foreground">{label}</div>
+        <div
+          className={
+            "mt-1 text-lg font-semibold " +
+            (tone === "success"
+              ? "text-success"
+              : tone === "warning"
+                ? "text-warning"
+                : tone === "destructive"
+                  ? "text-destructive"
+                  : "")
           }
         >
           {value}

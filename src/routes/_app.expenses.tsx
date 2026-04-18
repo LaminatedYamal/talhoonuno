@@ -2,12 +2,14 @@ import { createFileRoute } from "@tanstack/react-router";
 import { useMemo, useState } from "react";
 import { useMutation, useQueryClient } from "@tanstack/react-query";
 import { format, parseISO } from "date-fns";
+import { pt as ptLocale, enUS as enLocale } from "date-fns/locale";
 import { toast } from "sonner";
 import { Plus, Pencil, Trash2, Wallet } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
 import { Badge } from "@/components/ui/badge";
 import {
   Select,
@@ -27,8 +29,10 @@ import {
   AlertDialogTitle,
 } from "@/components/ui/alert-dialog";
 import { useExpenses, type Expense } from "@/lib/data-hooks";
-import { currency, expenseCategories, expenseCategoryLabel, type ExpenseCategory } from "@/lib/format";
+import { expenseCategories, type ExpenseCategory } from "@/lib/format";
 import { ExpenseDialog } from "@/components/ExpenseDialog";
+import { useCurrency, useI18n } from "@/i18n/I18nProvider";
+import { datePresets, type PresetKey } from "@/lib/date-presets";
 
 export const Route = createFileRoute("/_app/expenses")({
   component: ExpensesPage,
@@ -36,6 +40,10 @@ export const Route = createFileRoute("/_app/expenses")({
 
 function ExpensesPage() {
   const { data: expenses, isLoading } = useExpenses();
+  const { t, lang } = useI18n();
+  const currency = useCurrency();
+  const dLocale = lang === "pt" ? ptLocale : enLocale;
+  const [preset, setPreset] = useState<PresetKey>("this_month");
   const [from, setFrom] = useState("");
   const [to, setTo] = useState("");
   const [cat, setCat] = useState<ExpenseCategory | "all">("all");
@@ -44,6 +52,11 @@ function ExpensesPage() {
   const [deleteId, setDeleteId] = useState<string | null>(null);
   const qc = useQueryClient();
 
+  const range = useMemo(() => {
+    if (preset === "custom") return { from, to };
+    return datePresets[preset]();
+  }, [preset, from, to]);
+
   const remove = useMutation({
     mutationFn: async (id: string) => {
       const { error } = await supabase.from("expenses").delete().eq("id", id);
@@ -51,19 +64,19 @@ function ExpensesPage() {
     },
     onSuccess: () => {
       qc.invalidateQueries({ queryKey: ["expenses"] });
-      toast.success("Expense deleted");
+      toast.success(t.expenses.deletedToast);
       setDeleteId(null);
     },
-    onError: (e) => toast.error(e instanceof Error ? e.message : "Failed"),
+    onError: (e) => toast.error(e instanceof Error ? e.message : t.common.somethingWrong),
   });
 
   const filtered = useMemo(() => {
     let rows = expenses ?? [];
     if (cat !== "all") rows = rows.filter((r) => r.category === cat);
-    if (from) rows = rows.filter((r) => r.expense_date >= from);
-    if (to) rows = rows.filter((r) => r.expense_date <= to);
+    if (range.from) rows = rows.filter((r) => r.expense_date >= range.from);
+    if (range.to) rows = rows.filter((r) => r.expense_date <= range.to);
     return rows;
-  }, [expenses, cat, from, to]);
+  }, [expenses, cat, range]);
 
   const grouped = useMemo(() => {
     const map = new Map<string, Expense[]>();
@@ -87,20 +100,18 @@ function ExpensesPage() {
     <div className="space-y-6">
       <div className="flex flex-wrap items-center justify-between gap-3">
         <div>
-          <h1 className="text-2xl font-bold tracking-tight">Expenses</h1>
-          <p className="text-sm text-muted-foreground">
-            Daily costs grouped by date with category totals.
-          </p>
+          <h1 className="text-2xl font-bold tracking-tight">{t.expenses.title}</h1>
+          <p className="text-sm text-muted-foreground">{t.expenses.subtitle}</p>
         </div>
         <Button onClick={() => setAdding(true)}>
-          <Plus className="h-4 w-4" /> New expense
+          <Plus className="h-4 w-4" /> {t.expenses.newExpense}
         </Button>
       </div>
 
       <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
         <Card>
           <CardContent className="p-4">
-            <div className="text-xs uppercase text-muted-foreground">Total</div>
+            <div className="text-xs uppercase text-muted-foreground">{t.common.total}</div>
             <div className="mt-1 text-xl font-bold">{currency(total)}</div>
           </CardContent>
         </Card>
@@ -108,7 +119,7 @@ function ExpensesPage() {
           <Card key={c}>
             <CardContent className="p-4">
               <div className="text-xs uppercase text-muted-foreground">
-                {expenseCategoryLabel(c)}
+                {t.expenseCat[c as ExpenseCategory]}
               </div>
               <div className="mt-1 text-xl font-bold">{currency(v)}</div>
             </CardContent>
@@ -118,22 +129,66 @@ function ExpensesPage() {
 
       <Card>
         <CardContent className="p-4">
-          <div className="grid gap-3 md:grid-cols-3">
-            <Select value={cat} onValueChange={(v) => setCat(v as ExpenseCategory | "all")}>
-              <SelectTrigger>
-                <SelectValue />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value="all">All categories</SelectItem>
-                {expenseCategories.map((c) => (
-                  <SelectItem key={c} value={c}>
-                    {expenseCategoryLabel(c)}
-                  </SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
-            <Input type="date" value={from} onChange={(e) => setFrom(e.target.value)} />
-            <Input type="date" value={to} onChange={(e) => setTo(e.target.value)} />
+          <div className="grid gap-3 md:grid-cols-5">
+            <div className="space-y-1">
+              <Label className="text-xs">{t.common.category}</Label>
+              <Select value={cat} onValueChange={(v) => setCat(v as ExpenseCategory | "all")}>
+                <SelectTrigger>
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="all">{t.expenses.allCategories}</SelectItem>
+                  {expenseCategories.map((c) => (
+                    <SelectItem key={c} value={c}>
+                      {t.expenseCat[c]}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+            <div className="space-y-1">
+              <Label className="text-xs">{t.reports.preset}</Label>
+              <Select value={preset} onValueChange={(v) => setPreset(v as PresetKey)}>
+                <SelectTrigger>
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="today">{t.reports.today}</SelectItem>
+                  <SelectItem value="yesterday">{t.reports.yesterday}</SelectItem>
+                  <SelectItem value="this_week">{t.reports.thisWeek}</SelectItem>
+                  <SelectItem value="last_week">{t.reports.lastWeek}</SelectItem>
+                  <SelectItem value="this_month">{t.reports.thisMonth}</SelectItem>
+                  <SelectItem value="last_month">{t.reports.lastMonth}</SelectItem>
+                  <SelectItem value="this_year">{t.reports.thisYear}</SelectItem>
+                  <SelectItem value="all">{t.expenses.allCategories /* all */}</SelectItem>
+                  <SelectItem value="custom">{t.reports.custom}</SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
+            <div className="space-y-1">
+              <Label className="text-xs">{t.common.from}</Label>
+              <Input
+                type="date"
+                value={preset === "custom" ? from : range.from}
+                disabled={preset !== "custom"}
+                onChange={(e) => setFrom(e.target.value)}
+              />
+            </div>
+            <div className="space-y-1">
+              <Label className="text-xs">{t.common.to}</Label>
+              <Input
+                type="date"
+                value={preset === "custom" ? to : range.to}
+                disabled={preset !== "custom"}
+                onChange={(e) => setTo(e.target.value)}
+              />
+            </div>
+            <div className="space-y-1">
+              <Label className="text-xs">{t.common.count}</Label>
+              <div className="flex h-9 items-center rounded-md border bg-muted/40 px-3 text-sm font-semibold">
+                {filtered.length}
+              </div>
+            </div>
           </div>
         </CardContent>
       </Card>
@@ -141,19 +196,17 @@ function ExpensesPage() {
       {isLoading ? (
         <Card>
           <CardContent className="p-8 text-center text-sm text-muted-foreground">
-            Loading…
+            {t.common.loading}
           </CardContent>
         </Card>
       ) : grouped.length === 0 ? (
         <Card className="border-dashed">
           <CardContent className="flex flex-col items-center gap-3 p-12 text-center">
             <Wallet className="h-10 w-10 text-muted-foreground" />
-            <div className="font-medium">No expenses recorded</div>
-            <p className="max-w-sm text-sm text-muted-foreground">
-              Track meat purchases, supplies, utilities and wages to calculate true profit.
-            </p>
+            <div className="font-medium">{t.expenses.none}</div>
+            <p className="max-w-sm text-sm text-muted-foreground">{t.expenses.noneTip}</p>
             <Button onClick={() => setAdding(true)}>
-              <Plus className="h-4 w-4" /> Add expense
+              <Plus className="h-4 w-4" /> {t.expenses.addExpense}
             </Button>
           </CardContent>
         </Card>
@@ -166,7 +219,7 @@ function ExpensesPage() {
                 <CardContent className="p-0">
                   <div className="flex items-center justify-between border-b bg-muted/40 px-4 py-2.5">
                     <div className="font-semibold">
-                      {format(parseISO(date), "EEEE, MMM d, yyyy")}
+                      {format(parseISO(date), "EEEE, d MMM yyyy", { locale: dLocale })}
                     </div>
                     <div className="text-sm font-bold">{currency(dayTotal)}</div>
                   </div>
@@ -177,13 +230,13 @@ function ExpensesPage() {
                         className="flex items-center gap-3 px-4 py-3 hover:bg-accent/40"
                       >
                         <Badge variant="secondary" className="shrink-0">
-                          {expenseCategoryLabel(e.category)}
+                          {t.expenseCat[e.category]}
                         </Badge>
                         <div className="min-w-0 flex-1">
                           {e.notes ? (
                             <div className="truncate text-sm">{e.notes}</div>
                           ) : (
-                            <div className="text-sm text-muted-foreground">No notes</div>
+                            <div className="text-sm text-muted-foreground">{t.expenses.noNotes}</div>
                           )}
                         </div>
                         <div className="font-semibold">{currency(e.amount)}</div>
@@ -218,16 +271,16 @@ function ExpensesPage() {
       <AlertDialog open={!!deleteId} onOpenChange={(v) => !v && setDeleteId(null)}>
         <AlertDialogContent>
           <AlertDialogHeader>
-            <AlertDialogTitle>Delete expense?</AlertDialogTitle>
-            <AlertDialogDescription>This cannot be undone.</AlertDialogDescription>
+            <AlertDialogTitle>{t.expenses.deleteTitle}</AlertDialogTitle>
+            <AlertDialogDescription>{t.expenses.deleteDescription}</AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter>
-            <AlertDialogCancel>Cancel</AlertDialogCancel>
+            <AlertDialogCancel>{t.common.cancel}</AlertDialogCancel>
             <AlertDialogAction
               onClick={() => deleteId && remove.mutate(deleteId)}
               className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
             >
-              Delete
+              {t.common.delete}
             </AlertDialogAction>
           </AlertDialogFooter>
         </AlertDialogContent>
