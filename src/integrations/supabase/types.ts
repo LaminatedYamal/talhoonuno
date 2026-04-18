@@ -23,7 +23,6 @@ export type Database = {
           expense_date: string
           id: string
           notes: string | null
-          paid: boolean
           updated_at: string
         }
         Insert: {
@@ -34,7 +33,6 @@ export type Database = {
           expense_date?: string
           id?: string
           notes?: string | null
-          paid?: boolean
           updated_at?: string
         }
         Update: {
@@ -45,7 +43,6 @@ export type Database = {
           expense_date?: string
           id?: string
           notes?: string | null
-          paid?: boolean
           updated_at?: string
         }
         Relationships: []

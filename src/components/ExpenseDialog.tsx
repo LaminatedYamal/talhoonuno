@@ -94,12 +94,16 @@ export function ExpenseDialog({ open, onOpenChange, expense }: Props) {
 
   const mutation = useMutation({
     mutationFn: async (values: z.infer<typeof schema>) => {
+      let finalNotes = values.notes || "";
+      if (values.paid === "unpaid") {
+        finalNotes = `[PENDENTE] ${finalNotes}`.trim();
+      }
+
       const payload = {
         expense_date: values.expense_date,
         category: values.category,
         amount: values.amount,
-        paid: values.paid === "paid",
-        notes: values.notes || null,
+        notes: finalNotes || null,
       };
       if (editing && expense) {
         const { error } = await supabase.from("expenses").update(payload).eq("id", expense.id);

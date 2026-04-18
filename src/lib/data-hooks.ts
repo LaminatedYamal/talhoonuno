@@ -53,11 +53,19 @@ export function useExpenses() {
     queryFn: async (): Promise<Expense[]> => {
       const { data, error } = await supabase
         .from("expenses")
-        .select("id,expense_date,category,amount,paid,notes,created_at")
+        .select("id,expense_date,category,amount,notes,created_at")
         .order("expense_date", { ascending: false })
         .order("created_at", { ascending: false });
       if (error) throw error;
-      return (data ?? []).map((d) => ({ ...d, amount: Number(d.amount), paid: d.paid ?? true })) as Expense[];
+      return (data ?? []).map((d) => {
+        const isPending = d.notes?.includes("[PENDENTE]");
+        return {
+          ...d,
+          amount: Number(d.amount),
+          paid: !isPending,
+          notes: d.notes?.replace("[PENDENTE]", "").trim() || null,
+        };
+      }) as Expense[];
     },
   });
 }
