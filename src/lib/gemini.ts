@@ -52,7 +52,7 @@ export async function extractDocumentWithGemini(dataUrl: string, kind: ExtractKi
   const base64Data = match[2];
 
   // Using gemini-2.0-flash as it's the latest and greatest vision model
-  const geminiUrl = \`https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:generateContent?key=\${apiKey}\`;
+  const geminiUrl = `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:generateContent?key=${apiKey}`;
 
   const res = await fetch(geminiUrl, {
     method: "POST",
@@ -93,7 +93,7 @@ export async function extractDocumentWithGemini(dataUrl: string, kind: ExtractKi
   }
 
   try {
-    const cleaned = textContent.replace(/\`\`\`json\\n?/g, "").replace(/\`\`\`\\n?/g, "").trim();
+    const cleaned = textContent.replace(/```json\n?/g, "").replace(/```\n?/g, "").trim();
     return JSON.parse(cleaned);
   } catch (e) {
     throw new Error("Invalid AI response format");
