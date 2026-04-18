@@ -32,7 +32,6 @@ const schema = z.object({
   customer_name: z.string().trim().min(1).max(120),
   invoice_date: z.string().min(1),
   amount: z.coerce.number().min(0).max(1_000_000),
-  paid: z.enum(["paid", "unpaid"]),
   notes: z.string().trim().max(500).optional().or(z.literal("")),
 });
 
@@ -51,7 +50,6 @@ export function InvoiceDialog({ open, onOpenChange, invoice }: Props) {
     invoice?.invoice_date ?? new Date().toISOString().slice(0, 10),
   );
   const [amount, setAmount] = useState<string>(invoice ? String(invoice.amount) : "");
-  const [paid, setPaid] = useState<"paid" | "unpaid">(invoice?.paid ? "paid" : "unpaid");
   const [notes, setNotes] = useState(invoice?.notes ?? "");
   const [extracting, setExtracting] = useState(false);
   const fileInput = useRef<HTMLInputElement>(null);
@@ -77,7 +75,6 @@ export function InvoiceDialog({ open, onOpenChange, invoice }: Props) {
             invoice_date?: string;
             amount?: number;
             customer_name?: string;
-            paid?: boolean;
             notes?: string;
           }
         | undefined;
@@ -85,7 +82,6 @@ export function InvoiceDialog({ open, onOpenChange, invoice }: Props) {
       if (r.invoice_date) setDate(r.invoice_date);
       if (typeof r.amount === "number" && r.amount > 0) setAmount(String(r.amount));
       if (r.customer_name) setCustomer(r.customer_name);
-      if (typeof r.paid === "boolean") setPaid(r.paid ? "paid" : "unpaid");
       if (r.notes) setNotes(r.notes);
       toast.success(t.common.extractedOk);
     } catch (err) {
@@ -101,7 +97,7 @@ export function InvoiceDialog({ open, onOpenChange, invoice }: Props) {
         customer_name: values.customer_name,
         invoice_date: values.invoice_date,
         amount: values.amount,
-        paid: values.paid === "paid",
+        paid: true,
         notes: values.notes || null,
       };
       if (editing && invoice) {
@@ -129,7 +125,6 @@ export function InvoiceDialog({ open, onOpenChange, invoice }: Props) {
       customer_name: customer,
       invoice_date: date,
       amount,
-      paid,
       notes,
     });
     if (!parsed.success) {
@@ -237,18 +232,6 @@ export function InvoiceDialog({ open, onOpenChange, invoice }: Props) {
                 required
               />
             </div>
-          </div>
-          <div className="space-y-2">
-            <Label>{t.common.status}</Label>
-            <Select value={paid} onValueChange={(v) => setPaid(v as "paid" | "unpaid")}>
-              <SelectTrigger>
-                <SelectValue />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value="unpaid">{t.revenue.unpaid}</SelectItem>
-                <SelectItem value="paid">{t.revenue.paid}</SelectItem>
-              </SelectContent>
-            </Select>
           </div>
           <div className="space-y-2">
             <Label htmlFor="notes">{t.common.notesOptional}</Label>

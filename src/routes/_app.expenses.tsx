@@ -245,6 +245,11 @@ function ExpensesPage() {
                           <Badge variant="secondary" className="shrink-0">
                             {t.expenseCat[e.category]}
                           </Badge>
+                          {!e.paid && (
+                            <Badge variant="outline" className="border-warning text-warning shrink-0">
+                              {t.revenue.unpaid}
+                            </Badge>
+                          )}
                           <div className="font-bold text-lg md:hidden">{currency(e.amount)}</div>
                         </div>
                         <div className="min-w-0 flex-1">

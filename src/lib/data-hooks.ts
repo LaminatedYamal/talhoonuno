@@ -27,6 +27,7 @@ export type Expense = {
   expense_date: string;
   category: "meat_purchases" | "supplies" | "utilities" | "wages" | "rent" | "other";
   amount: number;
+  paid: boolean;
   notes: string | null;
   created_at: string;
 };
@@ -52,11 +53,11 @@ export function useExpenses() {
     queryFn: async (): Promise<Expense[]> => {
       const { data, error } = await supabase
         .from("expenses")
-        .select("id,expense_date,category,amount,notes,created_at")
+        .select("id,expense_date,category,amount,paid,notes,created_at")
         .order("expense_date", { ascending: false })
         .order("created_at", { ascending: false });
       if (error) throw error;
-      return (data ?? []).map((d) => ({ ...d, amount: Number(d.amount) })) as Expense[];
+      return (data ?? []).map((d) => ({ ...d, amount: Number(d.amount), paid: d.paid ?? true })) as Expense[];
     },
   });
 }

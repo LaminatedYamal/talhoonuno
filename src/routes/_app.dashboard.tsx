@@ -48,7 +48,8 @@ function Dashboard() {
     const expToday = sumInRange(expenses, (e) => e.expense_date, r.todayStart, r.todayEnd);
     const expWeek = sumInRange(expenses, (e) => e.expense_date, r.weekStart, r.weekEnd);
     const expMonth = sumInRange(expenses, (e) => e.expense_date, r.monthStart, r.monthEnd);
-    const outstanding = (invoices ?? []).filter((i) => !i.paid).reduce((a, i) => a + i.amount, 0);
+    const outstanding = (invoices ?? []).filter((i) => i.paid === false).reduce((a, i) => a + i.amount, 0);
+    const toPay = (expenses ?? []).filter((e) => e.paid === false).reduce((a, e) => a + e.amount, 0);
     const paidCount = (invoices ?? []).filter((i) => i.paid).length;
     const unpaidCount = (invoices ?? []).filter((i) => !i.paid).length;
     return {
@@ -59,6 +60,7 @@ function Dashboard() {
       profitWeek: revWeek - expWeek,
       profitMonth: revMonth - expMonth,
       outstanding,
+      toPay,
       paidCount,
       unpaidCount,
     };
@@ -113,7 +115,7 @@ function Dashboard() {
         />
         <KpiCard
           title={t.dashboard.toPay}
-          value={currency(stats.expMonth)}
+          value={currency(stats.toPay)}
           icon={<AlertCircle className="h-4 w-4" />}
           tone="warning"
           loading={loading}

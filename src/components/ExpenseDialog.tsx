@@ -33,6 +33,7 @@ const schema = z.object({
   expense_date: z.string().min(1),
   category: z.enum(expenseCategories),
   amount: z.coerce.number().min(0).max(1_000_000),
+  paid: z.enum(["paid", "unpaid"]),
   notes: z.string().trim().max(500).optional().or(z.literal("")),
 });
 
@@ -53,6 +54,7 @@ export function ExpenseDialog({ open, onOpenChange, expense }: Props) {
     (expense?.category as ExpenseCategory) ?? "meat_purchases",
   );
   const [amount, setAmount] = useState<string>(expense ? String(expense.amount) : "");
+  const [paid, setPaid] = useState<"paid" | "unpaid">(expense?.paid === false ? "unpaid" : "paid");
   const [notes, setNotes] = useState(expense?.notes ?? "");
   const [extracting, setExtracting] = useState(false);
   const fileInput = useRef<HTMLInputElement>(null);
@@ -74,12 +76,13 @@ export function ExpenseDialog({ open, onOpenChange, expense }: Props) {
       const dataUrl = await fileToDataUrl(file);
       const result = await extractDocumentWithGemini(dataUrl, "expense", modeRef.current);
       const r = result as
-        | { expense_date?: string; amount?: number; category?: ExpenseCategory; notes?: string }
+        | { expense_date?: string; amount?: number; category?: ExpenseCategory; paid?: boolean; notes?: string }
         | undefined;
       if (!r) throw new Error("No data");
       if (r.expense_date) setDate(r.expense_date);
       if (typeof r.amount === "number" && r.amount > 0) setAmount(String(r.amount));
       if (r.category && expenseCategories.includes(r.category)) setCategory(r.category);
+      if (typeof r.paid === "boolean") setPaid(r.paid ? "paid" : "unpaid");
       if (r.notes) setNotes(r.notes);
       toast.success(t.common.extractedOk);
     } catch (err) {
@@ -95,6 +98,7 @@ export function ExpenseDialog({ open, onOpenChange, expense }: Props) {
         expense_date: values.expense_date,
         category: values.category,
         amount: values.amount,
+        paid: values.paid === "paid",
         notes: values.notes || null,
       };
       if (editing && expense) {
@@ -118,7 +122,7 @@ export function ExpenseDialog({ open, onOpenChange, expense }: Props) {
 
   const handleSubmit = (e: FormEvent) => {
     e.preventDefault();
-    const parsed = schema.safeParse({ expense_date: date, category, amount, notes });
+    const parsed = schema.safeParse({ expense_date: date, category, amount, paid, notes });
     if (!parsed.success) {
       toast.error(parsed.error.issues[0]?.message ?? t.common.somethingWrong);
       return;
@@ -227,6 +231,18 @@ export function ExpenseDialog({ open, onOpenChange, expense }: Props) {
                     {t.expenseCat[c]}
                   </SelectItem>
                 ))}
+              </SelectContent>
+            </Select>
+          </div>
+          <div className="space-y-2">
+            <Label>{t.common.status}</Label>
+            <Select value={paid} onValueChange={(v) => setPaid(v as "paid" | "unpaid")}>
+              <SelectTrigger>
+                <SelectValue />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="unpaid">{t.revenue.unpaid}</SelectItem>
+                <SelectItem value="paid">{t.revenue.paid}</SelectItem>
               </SelectContent>
             </Select>
           </div>
