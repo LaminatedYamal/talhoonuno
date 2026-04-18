@@ -27,7 +27,7 @@ import { expenseCategories, type ExpenseCategory } from "@/lib/format";
 import type { Expense } from "@/lib/data-hooks";
 import { useI18n } from "@/i18n/I18nProvider";
 import { fileToDataUrl } from "@/lib/image";
-import { extractDocumentWithGemini } from "@/lib/gemini";
+import { extractDocumentWithGemini, type ExtractMode } from "@/lib/gemini";
 
 const schema = z.object({
   expense_date: z.string().min(1),
@@ -56,8 +56,14 @@ export function ExpenseDialog({ open, onOpenChange, expense }: Props) {
   const [notes, setNotes] = useState(expense?.notes ?? "");
   const [extracting, setExtracting] = useState(false);
   const fileInput = useRef<HTMLInputElement>(null);
+  const modeRef = useRef<ExtractMode>("total");
 
   const key = `${expense?.id ?? "new"}-${open}`;
+
+  const handlePhotoClick = (mode: ExtractMode) => {
+    modeRef.current = mode;
+    fileInput.current?.click();
+  };
 
   const handlePhoto = async (e: ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
@@ -66,7 +72,7 @@ export function ExpenseDialog({ open, onOpenChange, expense }: Props) {
     setExtracting(true);
     try {
       const dataUrl = await fileToDataUrl(file);
-      const result = await extractDocumentWithGemini(dataUrl, "expense");
+      const result = await extractDocumentWithGemini(dataUrl, "expense", modeRef.current);
       const r = result as
         | { expense_date?: string; amount?: number; category?: ExpenseCategory; notes?: string }
         | undefined;
@@ -140,25 +146,46 @@ export function ExpenseDialog({ open, onOpenChange, expense }: Props) {
               className="hidden"
               onChange={handlePhoto}
             />
-            <Button
-              type="button"
-              variant="outline"
-              className="w-full border-primary/30"
-              onClick={() => fileInput.current?.click()}
-              disabled={extracting}
-            >
-              {extracting ? (
-                <>
-                  <Loader2 className="h-4 w-4 animate-spin" /> {t.common.extracting}
-                </>
-              ) : (
-                <>
-                  <Camera className="h-4 w-4" />
-                  <Sparkles className="h-3 w-3 text-gold" />
-                  {t.common.photo}
-                </>
-              )}
-            </Button>
+            <div className="flex flex-col gap-2">
+              <Button
+                type="button"
+                variant="outline"
+                className="w-full border-primary/30"
+                onClick={() => handlePhotoClick("total")}
+                disabled={extracting}
+              >
+                {extracting && modeRef.current === "total" ? (
+                  <>
+                    <Loader2 className="h-4 w-4 animate-spin" /> {t.common.extracting}
+                  </>
+                ) : (
+                  <>
+                    <Camera className="h-4 w-4" />
+                    <Sparkles className="h-3 w-3 text-gold" />
+                    Ler Total (Normal)
+                  </>
+                )}
+              </Button>
+              <Button
+                type="button"
+                variant="outline"
+                className="w-full border-primary/30"
+                onClick={() => handlePhotoClick("items")}
+                disabled={extracting}
+              >
+                {extracting && modeRef.current === "items" ? (
+                  <>
+                    <Loader2 className="h-4 w-4 animate-spin" /> {t.common.extracting}
+                  </>
+                ) : (
+                  <>
+                    <Camera className="h-4 w-4" />
+                    <Sparkles className="h-3 w-3 text-gold" />
+                    Calcular Produtos (Peso x Preço)
+                  </>
+                )}
+              </Button>
+            </div>
           </div>
         )}
 

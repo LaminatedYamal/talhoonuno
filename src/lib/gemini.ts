@@ -31,7 +31,9 @@ Extract the following fields and return ONLY valid JSON (no markdown, no code fe
 Set paid to true only if the document is clearly marked paid/quitação/pago, otherwise false.
 Use dot as decimal separator. Use the grand total.`;
 
-export async function extractDocumentWithGemini(dataUrl: string, kind: ExtractKind) {
+export type ExtractMode = "total" | "items";
+
+export async function extractDocumentWithGemini(dataUrl: string, kind: ExtractKind, mode: ExtractMode = "total") {
   let apiKey = localStorage.getItem("GEMINI_API_KEY");
 
   if (!apiKey) {
@@ -43,7 +45,17 @@ export async function extractDocumentWithGemini(dataUrl: string, kind: ExtractKi
     apiKey = apiKey.trim();
   }
 
-  const prompt = kind === "expense" ? expensePrompt : revenuePrompt;
+  let prompt = kind === "expense" ? expensePrompt : revenuePrompt;
+
+  if (mode === "items") {
+    prompt += `\n\nCRITICAL INSTRUCTION FOR ITEMS MODE: 
+The user wants you to calculate the total from individual line items (e.g. "pork belly 3kg at 5.00/kg").
+1. Identify all items, their weights (or quantities), and price per unit/kg.
+2. Calculate the cost for each item (weight x price).
+3. Sum all the individual costs to get the grand total. 
+4. Return this calculated grand total as the "amount".
+5. In the "notes" field, write a clear breakdown of the items, e.g. "Pork: 3kg @ 5.00 = 15.00 | Lamb: 5kg @ 2.00 = 10.00".`;
+  }
 
   const match = dataUrl.match(/^data:(image\/[^;]+);base64,(.+)$/);
   if (!match) {
